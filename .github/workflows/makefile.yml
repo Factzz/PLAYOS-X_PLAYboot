@@ -1,0 +1,68 @@
+name: Build U-Boot
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout U-Boot
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libncurses5-dev \
+            device-tree-compiler \
+            lzop
+
+      - name: Install Linaro 6.3.1 toolchain
+        run: |
+          sudo mkdir -p /opt/toolchains
+
+          sudo git clone \
+            --depth 1 \
+            --branch develop-11.0 \
+            https://github.com/rockchip-toybrick/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu.git \
+            /opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
+
+      - name: Verify toolchain
+        run: |
+          /opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-gcc --version
+
+      - name: Build U-Boot
+        run: |
+          chmod +x make.sh
+          ./make.sh odroidgoa
+
+      - name: Verify build outputs
+        run: |
+          test -f sd_fuse/idbloader.img
+          test -f sd_fuse/uboot.img
+          test -f sd_fuse/trust.img
+
+          echo "Build outputs:"
+          ls -lh sd_fuse/idbloader.img
+          ls -lh sd_fuse/uboot.img
+          ls -lh sd_fuse/trust.img
+
+      - name: Upload U-Boot
+        uses: actions/upload-artifact@v4
+        with:
+          name: rg351mp-uboot
+          path: |
+            sd_fuse/idbloader.img
+            sd_fuse/uboot.img
+            sd_fuse/trust.img
